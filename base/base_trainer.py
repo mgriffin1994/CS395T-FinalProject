@@ -140,20 +140,18 @@ class BaseTrainer:
                 self._save_checkpoint(epoch, save_best=best)
 
     def _train_epoch(self, epoch):
-        """
-        Training logic for an epoch
-
-        :param epoch: Current epoch number
-        """
+        """Training logic for an epoch"""
         raise NotImplementedError
 
     def _save_checkpoint(self, epoch, save_best=False):
-        """
-        Saving checkpoints
+        """Saving checkpoints
 
-        :param epoch: current epoch number
-        :param log: logging information of the epoch
-        :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
+        Inputs
+        ------
+        epoch : int
+        save_best : bool, optional
+            Defaults to False
+
         """
         state = {
             'epoch': epoch,
@@ -177,10 +175,13 @@ class BaseTrainer:
             self.logger.info("Saving current best: {} ...".format('model_best.pth'))
 
     def _resume_checkpoint(self, resume_path):
-        """
-        Resume from saved checkpoints
+        """Resume from saved checkpoints
 
-        :param resume_path: Checkpoint path to be resumed
+        Inputs
+        ------
+        resume_path : str
+            Checkpoint path to be resumed
+
         """
         self.logger.info("Loading checkpoint: {} ...".format(resume_path))
         checkpoint = torch.load(resume_path)
