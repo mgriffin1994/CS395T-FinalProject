@@ -7,20 +7,27 @@ import torch
 from utils.util import ensure_dir
 from utils.visualization import WriterTensorboardX
 
+import collections
 
 class BaseTrainer:
     """
     Base class for all trainers
     """
-    def __init__(self, model, loss, metrics, optimizer, resume, config, train_logger=None):
+    def __init__(self, models, loss, metrics, optimizer, resume, config, train_logger=None):
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
 
+        if not isinstance(models, collections.Iterable):
+            models = [models]
+
         # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(config['n_gpu'])
-        self.model = model.to(self.device)
-        if len(device_ids) > 1:
-            self.model = torch.nn.DataParallel(model, device_ids=device_ids)
+        self.models = []
+
+        for model in models:
+            self.models.append(model.to(self.device))
+            if len(device_ids) > 1:
+                self.models = torch.nn.DataParallel(models, device_ids=device_ids)
 
         self.loss = loss
         self.metrics = metrics
