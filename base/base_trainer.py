@@ -25,7 +25,9 @@ class BaseTrainer:
     models : list
         The list of PyTorch models to paramaterize
     loss : torch loss
-    metrics : torch metric
+    metrics : torch metrics
+    optimizer : list
+        List of optimizers
     resume : str
         Path to checkpoint
     config : str 
@@ -33,7 +35,7 @@ class BaseTrainer:
     train_logger : Logger
 
     """
-    def __init__(self, models, loss, metrics, optimizer, resume, config, train_logger=None):
+    def __init__(self, models, loss, metrics, optimizers, resume, config, train_logger=None):
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -54,7 +56,7 @@ class BaseTrainer:
 
         self.loss = loss
         self.metrics = metrics
-        self.optimizer = optimizer
+        self.optimizers = optimizers
 
         self.epochs = config['trainer']['epochs']
         self.save_freq = config['trainer']['save_freq']
@@ -156,7 +158,6 @@ class BaseTrainer:
         state = {
             'epoch': epoch,
             'logger': self.train_logger,
-            'optimizer': self.optimizer.state_dict(),
             'monitor_best': self.monitor_best,
             'config': self.config
         }
@@ -164,6 +165,8 @@ class BaseTrainer:
             arch = type(self.model).__name__
             state['arch'] = arch
             state['{}-statedict'.format(arch)] = model.state_dict()
+        for i, optimizer in enumerate(self.optimizers):
+            state['optimizer{}'.format(i)] = optimizer.state_dict()
 
         filename = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch))
         torch.save(state, filename)
@@ -185,19 +188,22 @@ class BaseTrainer:
         self.monitor_best = checkpoint['monitor_best']
 
         # load architecture params from checkpoint.
-        for i, model in enumerate(self.models):
-            if checkpoint['config']['arch'] != self.config['arch']:
-                    self.logger.warning('Warning: Architecture configuration given in config file is different from that of checkpoint. ' + \
-                                    'This may yield an exception while state_dict is being loaded.')
+        for model in self.models:
+            #if checkpoint['config']['arch'] != self.config['arch']:
+            #        self.logger.warning('Warning: Architecture configuration given in config file is different from that of checkpoint. ' + \
+            #                        'This may yield an exception while state_dict is being loaded.')
             arch = type(self.model).__name__
             model.load_state_dict(checkpoint['{}-state_dict'.format(arch)])
 
         # load optimizer state from checkpoint only when optimizer type is not changed. 
-        if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
-            self.logger.warning('Warning: Optimizer type given in config file is different from that of checkpoint. ' + \
-                                'Optimizer parameters not being resumed.')
-        else:
-            self.optimizer.load_state_dict(checkpoint['optimizer'])
+        for i, optimizer in enumerate(self.optimizers):
+            # TODO - fix this
+            opt_key = 'optimizer-{0}'.format(i)
+            if checkpoint['config'][opt_key]['type'] != self.config[opt_key]['type']:
+                self.logger.warning('Warning: Optimizer type given in config file is different from that of checkpoint. ' + \
+                                    'Optimizer parameters not being resumed.')
+            else:
+                optimizer.load_state_dict(checkpoint[opt_key])
     
         self.train_logger = checkpoint['logger']
         self.logger.info("Checkpoint '{}' (epoch {}) loaded".format(resume_path, self.start_epoch))
