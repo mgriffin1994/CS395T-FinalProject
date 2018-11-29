@@ -1,28 +1,25 @@
+"""base_model.py
+
+Base class for all models
+
+"""
 import logging
 import torch.nn as nn
 import numpy as np
 
 
 class BaseModel(nn.Module):
-    """
-    Base class for all models
-    """
+    """Base class for all models"""
     def __init__(self):
         super(BaseModel, self).__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def forward(self, *input):
-        """
-        Forward pass logic
-
-        :return: Model output
-        """
+        """Forward pass logic"""
         raise NotImplementedError
 
     def summary(self):
-        """
-        Model summary
-        """
+        """Model summary"""
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         params = sum([np.prod(p.size()) for p in model_parameters])
         self.logger.info('Trainable parameters: {}'.format(params))
