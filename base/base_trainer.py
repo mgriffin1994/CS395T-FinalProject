@@ -24,7 +24,6 @@ class BaseTrainer:
     ------
     models : list
         The list of PyTorch models to paramaterize
-    loss : torch loss
     metrics : torch metrics
     optimizer : list
         List of optimizers
@@ -35,7 +34,7 @@ class BaseTrainer:
     train_logger : Logger
 
     """
-    def __init__(self, models, loss, metrics, optimizers, resume, config, train_logger=None):
+    def __init__(self, models, metrics, optimizers, resume, config, train_logger=None):
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -54,7 +53,6 @@ class BaseTrainer:
             if len(device_ids) > 1:
                 self.models[i] = torch.nn.DataParallel(models, device_ids=device_ids)
 
-        self.loss = loss
         self.metrics = metrics
         self.optimizers = optimizers
 
