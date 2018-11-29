@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""base_trainer.py
+
+Base class for all trainers
+
+"""
 import os
 import math
 import json
@@ -10,8 +16,22 @@ from utils.visualization import WriterTensorboardX
 import collections
 
 class BaseTrainer:
-    """
+    """BaseTrainer
+
     Base class for all trainers
+
+    Inputs
+    ------
+    models : list
+        The list of PyTorch models to paramaterize
+    loss : torch loss
+    metrics : torch metric
+    resume : str
+        Path to checkpoint
+    config : str 
+        Path to .json configuration file
+    train_logger : Logger
+
     """
     def __init__(self, models, loss, metrics, optimizer, resume, config, train_logger=None):
         self.config = config
@@ -19,15 +39,18 @@ class BaseTrainer:
 
         if not isinstance(models, collections.Iterable):
             models = [models]
+        else:
+            assert len(models) > 0
 
         # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(config['n_gpu'])
         self.models = []
 
-        for model in models:
+        # TODO - check that this works
+        for i, model in enumerate(models):
             self.models.append(model.to(self.device))
             if len(device_ids) > 1:
-                self.models = torch.nn.DataParallel(models, device_ids=device_ids)
+                self.models[i] = torch.nn.DataParallel(models, device_ids=device_ids)
 
         self.loss = loss
         self.metrics = metrics
@@ -63,9 +86,7 @@ class BaseTrainer:
             self._resume_checkpoint(resume)
     
     def _prepare_device(self, n_gpu_use):
-        """ 
-        setup GPU device if available, move model into configured device
-        """ 
+        """Setup GPU device if available, move model into configured device""" 
         n_gpu = torch.cuda.device_count()
         if n_gpu_use > 0 and n_gpu == 0:
             self.logger.warning("Warning: There\'s no GPU available on this machine, training will be performed on CPU.")
@@ -79,9 +100,7 @@ class BaseTrainer:
         return device, list_ids
 
     def train(self):
-        """
-        Full training logic
-        """
+        """Full training logic"""
         for epoch in range(self.start_epoch, self.epochs + 1):
             result = self._train_epoch(epoch)
             
@@ -134,16 +153,18 @@ class BaseTrainer:
         :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
-        arch = type(self.model).__name__
         state = {
-            'arch': arch,
             'epoch': epoch,
             'logger': self.train_logger,
-            'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             'monitor_best': self.monitor_best,
             'config': self.config
         }
+        for i, model in enumerate(self.models):
+            arch = type(self.model).__name__
+            state['arch'] = arch
+            state['{}-statedict'.format(arch)] = model.state_dict()
+
         filename = os.path.join(self.checkpoint_dir, 'checkpoint-epoch{}.pth'.format(epoch))
         torch.save(state, filename)
         self.logger.info("Saving checkpoint: {} ...".format(filename))
@@ -164,10 +185,12 @@ class BaseTrainer:
         self.monitor_best = checkpoint['monitor_best']
 
         # load architecture params from checkpoint.
-        if checkpoint['config']['arch'] != self.config['arch']:
-            self.logger.warning('Warning: Architecture configuration given in config file is different from that of checkpoint. ' + \
-                                'This may yield an exception while state_dict is being loaded.')
-        self.model.load_state_dict(checkpoint['state_dict'])
+        for i, model in enumerate(self.models):
+            if checkpoint['config']['arch'] != self.config['arch']:
+                    self.logger.warning('Warning: Architecture configuration given in config file is different from that of checkpoint. ' + \
+                                    'This may yield an exception while state_dict is being loaded.')
+            arch = type(self.model).__name__
+            model.load_state_dict(checkpoint['{}-state_dict'.format(arch)])
 
         # load optimizer state from checkpoint only when optimizer type is not changed. 
         if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
