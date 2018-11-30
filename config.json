@@ -1,13 +1,19 @@
 {
-    "name": "Mnist_LeNet",
-    "n_gpu": 1,
+    "name": "EBGAN",
+    "n_gpu": 2,
     
-    "arch": {
-        "type": "MnistModel",
+    "g_arch": {
+        "type": "Generator",
         "args": {}
     },
+
+    "d_arch": {
+        "type": "Discriminator",
+        "args": {}
+    },
+
     "data_loader": {
-        "type": "MnistDataLoader",
+        "type": "CIFAR10DataLoader",
         "args":{
             "data_dir": "data/",
             "batch_size": 128,
@@ -16,7 +22,15 @@
             "num_workers": 2
         }
     },
-    "optimizer": {
+    "g_optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": true
+        }
+    },
+    "d_optimizer": {
         "type": "Adam",
         "args":{
             "lr": 0.001,
@@ -28,7 +42,14 @@
     "metrics": [
         "my_metric", "my_metric2"
     ],
-    "lr_scheduler": {
+    "g_lr_scheduler": {
+        "type":"StepLR",
+        "args":{
+            "step_size":50,
+            "gamma":0.1
+        }
+    },
+    "d_lr_scheduler": {
         "type":"StepLR",
         "args":{
             "step_size":50,
@@ -39,7 +60,7 @@
         "epochs": 1000,
         "save_dir": "saved/",
         "save_freq": 1,
-        "verbosity": 2,
+        "verbosity": 3,
         "monitor": "val_loss",
         "monitor_mode": "min"
     },

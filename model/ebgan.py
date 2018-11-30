@@ -7,7 +7,9 @@ Code forked from https://github.com/1Konny/EBGAN-pytorch
 
 """
 
-import torch.nn asn n
+import torch.nn as nn
+
+from base import BaseModel
 
 def _layer_init(m, mean, std):
     """Normal initialization for each layer"""
@@ -35,6 +37,27 @@ class Discriminator(BaseModel):
         super(Discriminator, self).__init__()
         self.hidden_dim = hidden_dim
 
+        """
+        self.enc_conv1 = nn.Conv2d(3, 64, 4, 2, 1)
+        self.enc_leak1 = nn.LeakyReLU(0.2, True)
+        self.enc_conv2 = nn.Conv2d(64, 128, 4, 2,1)
+        self.enc_bn2 = nn.BatchNorm2d(128)
+        self.enc_leak2 = nn.LeakyReLU(0.2, True)
+        self.enc_conv3 = nn.Conv2d(128, self.hidden_dim, 4, 2, 1)
+        self.enc_bn3 = nn.BatchNorm2d(self.hidden_dim)
+        self.enc_leak3 = nn.LeakyReLU(0.2, True)
+
+        self.dec_conv1 = nn.ConvTranspose2d(self.hidden_dim, 128, 4, 2, 1)
+        self.dec_bn1 = nn.BatchNorm2d(128)
+        self.dec_leak1 = nn.LeakyReLU(0.2, True)
+        self.dec_conv2 = nn.ConvTranspose2d(128, 64, 4, 2, 1)
+        self.dec_bn2 = nn.BatchNorm2d(64)
+        self.dec_leak2 = nn.LeakyReLU(0.2, True)
+        self.dec_conv3 = nn.ConvTranspose2d(64, 1, 4, 2, 1)
+        self.dec_bn3 = nn.BatchNorm2d(3)
+        self.dec_tan = nn.Tanh()
+        """
+
         self.encode = nn.Sequential(
             nn.Conv2d(3, 64, 4, 2, 1),
             nn.LeakyReLU(0.2, True),
@@ -60,6 +83,28 @@ class Discriminator(BaseModel):
         
     def forward(self, image):
         """Forward pass of Discriminator"""
+        """
+        x = self.enc_conv1(image)
+        x = self.enc_leak1(x)
+        x = self.enc_conv2(x)
+        x = self.enc_bn2(x)
+        x = self.enc_leak2(x)
+        x = self.enc_conv3(x)
+        x = self.enc_bn3(x)
+        latent = self.enc_leak3(x)
+
+        x = self.dec_conv1(latent)
+        x = self.dec_bn1(x)
+        x = self.dec_leak1(x)
+        x = self.dec_conv2(x)
+        x = self.dec_bn2(x)
+        x = self.dec_leak2(x)
+        x = self.dec_conv3(x)
+        x = self.dec_bn3(x)
+        x = self.dec_tan(x)
+        return x, latent.view(image.size(0), -1)
+        """
+
         latent = self.encode(image)
         out = self.decode(latent)
         return out, latent.view(image.size(0), -1)
@@ -70,7 +115,7 @@ class Discriminator(BaseModel):
             _layer_init(self._modules[m], mean, std)
 
 
-class Generator(nn.Module):
+class Generator(BaseModel):
     """EBGAN Generator
 
     Convolutional based generator.
@@ -88,6 +133,7 @@ class Generator(nn.Module):
         self.fc = nn.Sequential(
             nn.ConvTranspose2d(self.noise_dim, 4*4*1024, 1)
         )
+
         self.conv = nn.Sequential(
             nn.ConvTranspose2d(1024, 512, 4, 2, 1),
             nn.BatchNorm2d(512),

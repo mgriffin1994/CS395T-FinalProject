@@ -46,8 +46,8 @@ class EBGANTrainer(BaseTrainer):
     """EBGAN Trainer Class"""
     def __init__(self, generator, discriminator, metrics, 
                  g_optimizer, d_optimizer, resume, config, data_loader,
-                 margin=20, pt_regularization=0.1, valid_data_loader=None, lr_scheduler=None, train_logger=None):
-        super(EBGAN, self).__init__([generator, discriminator], metrics, [g_optimizer, d_optimizer], resume, config, train_logger)
+                 margin=20, pt_regularization=0.1, valid_data_loader=None, g_lr_scheduler=None, d_lr_scheduler=None, train_logger=None):
+        super(EBGANTrainer, self).__init__([generator, discriminator], metrics, [g_optimizer, d_optimizer], resume, config, train_logger)
         self.generator = generator
         self.discriminator = discriminator
         self.g_optimizer = g_optimizer
@@ -57,7 +57,8 @@ class EBGANTrainer(BaseTrainer):
         self.data_loader = data_loader
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
-        self.lr_scheduler = lr_scheduler
+        self.g_lr_scheduler = g_lr_scheduler
+        self.d_lr_scheduler = d_lr_scheduler
         self.log_step = int(np.sqrt(data_loader.batch_size))
         self.margin = margin
 
@@ -109,8 +110,7 @@ class EBGANTrainer(BaseTrainer):
 
         dlr = AverageMeter()
         dlf = AverageMeter()
-        glr = AverageMeter()
-        glf = AverageMeter()
+        g_loss = AverageMeter()
 
         end_time = time.time()
         for batch_idx, (data, labels) in enumerate(self.data_loader):
@@ -119,24 +119,25 @@ class EBGANTrainer(BaseTrainer):
             # Train the discriminator
             x_real = data.to(self.device)
             D_real = self.discriminator(x_real)[0]
+
             D_loss_real = self._discriminator_loss(x_real, D_real)
 
-            z = self.sample_z(self.data_loader.batch_size, self.generator.noise_dim)
+            z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
             z = z.to(self.device)
             x_fake = self.generator(z)
             D_fake = self.discriminator(x_fake.detach())[0]
             D_loss_fake = self._discriminator_loss(x_fake, D_fake)
 
             D_loss = D_loss_real
-            if D_loss_fake.data[0] < self.m:
-                D_loss += (self.m - D_loss_fake)
+            if D_loss_fake.data[0] < self.margin:
+                D_loss += (self.margin - D_loss_fake)
 
             self.d_optimizer.zero_grad()
             D_loss.backward()
             self.d_optimizer.step()
 
             # Train the generator
-            z = self.sample_z(self.data_loader.batch_size, self.generator.noise_dim)
+            z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
             z = z.to(self.device)
             x_fake = self.generator(z)
             D_fake, D_latent = self.discriminator(x_fake)
@@ -152,17 +153,15 @@ class EBGANTrainer(BaseTrainer):
             
             dlr.update(D_loss_real.item(), x_real.size(0))
             dlf.update(D_loss_fake.item(), x_real.size(0))
-            glr.update(G_loss_real.item(), z.size(0))
-            glf.update(G_loss_fake.item(), z.size(0))
+            g_loss.update(G_loss.item(), z.size(0))
 
             if self.verbosity >= 2:
-                info = 'Epoch: {} [{}/{} ({:.0f}%)]\t'
+                info = ('Epoch: {} [{}/{} ({:.0f}%)]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Discriminator Loss (Real) {dlr.val:.4f} ({dlr.avg:.4f})\t'
                       'Discriminator Loss (Fake) {dlf.val:.4f} ({dlf.avg:.4f})\t'
-                      'Generator Loss (Real) {glr.val:.4f} ({glr.avg:.4f})\t'
-                      'Generator Loss (Fake) {glf.val:.4f} ({glf.avg:.4f})\t'.format(
+                      'Generator Loss (Real) {g_loss.val:.4f} ({g_loss.avg:.4f})\t').format(
                     epoch,
                     batch_idx * self.data_loader.batch_size,
                     self.data_loader.n_samples,
@@ -171,18 +170,16 @@ class EBGANTrainer(BaseTrainer):
                     data_time=data_time,
                     dlr=dlr,
                     dlf=dlf,
-                    glr=glr,
-                    glf=glf)
+                    g_loss=g_loss)
                 if batch_idx % self.log_step == 0:
                     self.logger.info(info)
-                    self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                    self.writer.add_image('inp', make_grid(data.cpu(), nrow=8, normalize=True))
                 print (info)
 
         log = {
             'dlr' : dlr.avg,
             'dlf' : dlf.avg,
-            'glr' : glr.avg,
-            'glf' : glf.avg,
+            'g_loss' : g_loss.avg,
             'loss': total_loss / len(self.data_loader),
             #'metrics': (total_metrics / len(self.data_loader)).tolist()
         }
@@ -191,8 +188,10 @@ class EBGANTrainer(BaseTrainer):
             val_log = self._valid_epoch(epoch)
             log = {**log, **val_log}
 
-        if self.lr_scheduler is not None:
-            self.lr_scheduler.step()
+        if self.g_lr_scheduler is not None:
+            self.g_lr_scheduler.step()
+        if self.d_lr_scheduler is not None:
+            self.d_lr_scheduler.step()
 
         return log
 
@@ -208,8 +207,7 @@ class EBGANTrainer(BaseTrainer):
         data_time = AverageMeter()
         dlr = AverageMeter()
         dlf = AverageMeter()
-        glr = AverageMeter()
-        glf = AverageMeter()
+        g_loss = AverageMeter()
 
         end_time = time.time()
         with torch.no_grad():
@@ -227,8 +225,8 @@ class EBGANTrainer(BaseTrainer):
                 D_loss_fake = self._discriminator_loss(x_fake, D_fake)
 
                 D_loss = D_loss_real
-                if D_loss_fake.data[0] < self.m:
-                    D_loss += (self.m - D_loss_fake)
+                if D_loss_fake.data[0] < self.margin:
+                    D_loss += (self.margin - D_loss_fake)
 
                 z = self.sample_z(self.data_loader.batch_size, self.generator.noise_dim)
                 z = z.to(self.device)
@@ -241,8 +239,7 @@ class EBGANTrainer(BaseTrainer):
 
                 dlr.update(D_loss_real.item(), x_real.size(0))
                 dlf.update(D_loss_fake.item(), x_real.size(0))
-                glr.update(G_loss_real.item(), z.size(0))
-                glf.update(G_loss_fake.item(), z.size(0))
+                g_loss.update(G_loss.item(), z.size(0))
 
             if self.verbosity >= 2:
                 print ('Epoch: {} [{}/{} ({:.0f}%)]\t'
@@ -250,8 +247,7 @@ class EBGANTrainer(BaseTrainer):
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Discriminator Loss (Real) {dlr.val:.4f} ({dlr.avg:.4f})\t'
                       'Discriminator Loss (Fake) {dlf.val:.4f} ({dlf.avg:.4f})\t'
-                      'Generator Loss (Real) {glr.val:.4f} ({glr.avg:.4f})\t'
-                      'Generator Loss (Fake) {glf.val:.4f} ({glf.avg:.4f})\t'.format(
+                      'Generator Loss {g_loss.val:.4f} ({g_loss.avg:.4f})\t'.format(
                     epoch,
                     batch_idx * self.data_loader.batch_size,
                     self.data_loader.n_samples,
@@ -260,14 +256,12 @@ class EBGANTrainer(BaseTrainer):
                     data_time=data_time,
                     dlr=dlr,
                     dlf=dlf,
-                    glr=glr,
-                    glf=glf))
+                    g_loss=g_loss))
 
         log = {
             'dlr' : dlr.avg,
             'dlf' : dlf.avg,
-            'glr' : glr.avg,
-            'glf' : glf.avg,
+            'g_loss' : g_loss.avg,
             'loss': total_loss / len(self.data_loader),
         }
 
