@@ -65,7 +65,7 @@
         "monitor_mode": "min"
     },
     "visualization":{
-        "tensorboardX": true,
+        "tensorboardX": false,
         "log_dir": "saved/runs"
     }
 }
