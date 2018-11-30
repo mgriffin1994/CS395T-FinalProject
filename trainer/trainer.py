@@ -87,9 +87,8 @@ class Trainer(BaseTrainer):
         return log
 
     def _valid_epoch(self, epoch):
-        """
-        Validate after training an epoch
-
+        """Validate after training an epoch
+        
         :return: A log that contains information about validation
 
         Note:
