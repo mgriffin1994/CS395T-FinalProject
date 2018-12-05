@@ -18,8 +18,53 @@ def _layer_init(m, mean, std):
         if m.bias.data is not None:
             m.bias.data.zero_()
 
-
 class Discriminator(BaseModel):
+    def __init__(self, num_joint_angles=12, hidden_dim=256):
+        super(Discriminator, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_joint_angles = num_joint_angles
+        self.encode = nn.Sequential(
+            nn.Linear(num_joint_angles, 10),
+            nn.Tanh(),
+            nn.Linear(10, 8),
+            nn.Tanh(),
+            nn.Linear(8, 4),
+            nn.Tanh())
+        self.decode = nn.Sequential(
+            nn.Linear(4, 8),
+            nn.Tanh(),
+            nn.Linear(8, 10),
+            nn.Tanh(),
+            nn.Linear(10, num_joint_angles))
+
+    def forward(self, joint_angles):
+        latent = self.encode(joint_angles)
+        out = self.decode(latent)
+        return out, latent.view(joint_angles.size(0), -1)
+
+
+
+class Generator(BaseModel):
+    def __init__(self, num_outputs=12, noise_dim=100): 
+        super(Generator, self).__init__()
+        self.noise_dim = noise_dim
+        self.num_outputs = num_outputs
+        self.generator = nn.Sequential(
+                nn.Linear(noise_dim, 128),
+                nn.ReLU(),
+                nn.Linear(128, num_outputs),
+                nn.ReLU()) # TODO - decide what to do with this output layer
+
+    def forward(self, z):
+        #z = z.view(z.size(0), self.noise_dim, 1, 1)
+        out = self.generator(z)
+        return out
+
+    def _weight_init(self, mean, std):
+        for m in self._modules:
+            _layer_init(self._modules[m], mean, std)
+
+class CDiscriminator(BaseModel):
     def __init__(self, hidden_dim=256):
         """EBGAN Discriminator
 
@@ -34,7 +79,7 @@ class Discriminator(BaseModel):
             Defaults to 256.
 
         """
-        super(Discriminator, self).__init__()
+        super(CDiscriminator, self).__init__()
         self.hidden_dim = hidden_dim
 
         """
@@ -115,7 +160,7 @@ class Discriminator(BaseModel):
             _layer_init(self._modules[m], mean, std)
 
 
-class Generator(BaseModel):
+class CGenerator(BaseModel):
     """EBGAN Generator
 
     Convolutional based generator.
@@ -128,7 +173,7 @@ class Generator(BaseModel):
 
     """
     def __init__(self, noise_dim=100):
-        super(Generator, self).__init__()
+        super(CGenerator, self).__init__()
         self.noise_dim = noise_dim
         self.fc = nn.Sequential(
             nn.ConvTranspose2d(self.noise_dim, 4*4*1024, 1)

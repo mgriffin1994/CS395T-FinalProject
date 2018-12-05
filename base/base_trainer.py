@@ -158,7 +158,7 @@ class BaseTrainer:
             'config': self.config
         }
         for i, model in enumerate(self.models):
-            arch = type(self.model).__name__
+            arch = type(model).__name__
             state['arch'] = arch
             state['{}-statedict'.format(arch)] = model.state_dict()
         for i, optimizer in enumerate(self.optimizers):
@@ -191,7 +191,7 @@ class BaseTrainer:
             #if checkpoint['config']['arch'] != self.config['arch']:
             #        self.logger.warning('Warning: Architecture configuration given in config file is different from that of checkpoint. ' + \
             #                        'This may yield an exception while state_dict is being loaded.')
-            arch = type(self.model).__name__
+            arch = type(model).__name__
             model.load_state_dict(checkpoint['{}-state_dict'.format(arch)])
 
         # load optimizer state from checkpoint only when optimizer type is not changed. 

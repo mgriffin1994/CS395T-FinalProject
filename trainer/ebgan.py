@@ -129,7 +129,7 @@ class EBGANTrainer(BaseTrainer):
             D_loss_fake = self._discriminator_loss(x_fake, D_fake)
 
             D_loss = D_loss_real
-            if D_loss_fake.data[0] < self.margin:
+            if D_loss_fake.item() < self.margin:
                 D_loss += (self.margin - D_loss_fake)
 
             self.d_optimizer.zero_grad()
@@ -180,7 +180,6 @@ class EBGANTrainer(BaseTrainer):
             'dlr' : dlr.avg,
             'dlf' : dlf.avg,
             'g_loss' : g_loss.avg,
-            'loss': total_loss / len(self.data_loader),
             #'metrics': (total_metrics / len(self.data_loader)).tolist()
         }
 
@@ -218,17 +217,17 @@ class EBGANTrainer(BaseTrainer):
                 D_real = self.discriminator(x_real)[0]
                 D_loss_real = self._discriminator_loss(x_real, D_real)
 
-                z = self.sample_z(self.data_loader.batch_size, self.generator.noise_dim)
+                z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
                 z = z.to(self.device)
                 x_fake = self.generator(z)
                 D_fake = self.discriminator(x_fake.detach())[0]
                 D_loss_fake = self._discriminator_loss(x_fake, D_fake)
 
                 D_loss = D_loss_real
-                if D_loss_fake.data[0] < self.margin:
+                if D_loss_fake.item() < self.margin:
                     D_loss += (self.margin - D_loss_fake)
 
-                z = self.sample_z(self.data_loader.batch_size, self.generator.noise_dim)
+                z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
                 z = z.to(self.device)
                 x_fake = self.generator(z)
                 D_fake, D_latent = self.discriminator(x_fake)
@@ -241,28 +240,27 @@ class EBGANTrainer(BaseTrainer):
                 dlf.update(D_loss_fake.item(), x_real.size(0))
                 g_loss.update(G_loss.item(), z.size(0))
 
-            if self.verbosity >= 2:
-                print ('Epoch: {} [{}/{} ({:.0f}%)]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                      'Discriminator Loss (Real) {dlr.val:.4f} ({dlr.avg:.4f})\t'
-                      'Discriminator Loss (Fake) {dlf.val:.4f} ({dlf.avg:.4f})\t'
-                      'Generator Loss {g_loss.val:.4f} ({g_loss.avg:.4f})\t'.format(
-                    epoch,
-                    batch_idx * self.data_loader.batch_size,
-                    self.data_loader.n_samples,
-                    100.0 * batch_idx / len(self.data_loader),
-                    batch_time=batch_time,
-                    data_time=data_time,
-                    dlr=dlr,
-                    dlf=dlf,
-                    g_loss=g_loss))
+                if self.verbosity >= 2:
+                    print ('Epoch: {} [{}/{} ({:.0f}%)]\t'
+                          'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                          'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                          'Discriminator Loss (Real) {dlr.val:.4f} ({dlr.avg:.4f})\t'
+                          'Discriminator Loss (Fake) {dlf.val:.4f} ({dlf.avg:.4f})\t'
+                          'Generator Loss {g_loss.val:.4f} ({g_loss.avg:.4f})\t'.format(
+                        epoch,
+                        batch_idx * self.data_loader.batch_size,
+                        self.data_loader.n_samples,
+                        100.0 * batch_idx / len(self.data_loader),
+                        batch_time=batch_time,
+                        data_time=data_time,
+                        dlr=dlr,
+                        dlf=dlf,
+                        g_loss=g_loss))
 
         log = {
             'dlr' : dlr.avg,
             'dlf' : dlf.avg,
             'g_loss' : g_loss.avg,
-            'loss': total_loss / len(self.data_loader),
         }
 
         return log
