@@ -34,23 +34,22 @@ class ModelReader:
         # Create cursor if not already exists
         if self.grasp_cur == None:
             self.grasp_cur = self.conn.cursor()
-
-        # Query for grasps
-        sql_hand_grasps = """
-                            Select scaled_model_id, 
-                            grasp_pregrasp_joints, 
-                            grasp_grasp_joints, 
-                            grasp_pregrasp_position, 
-                            grasp_grasp_position, 
-                            grasp_contacts, 
-                            grasp_epsilon_quality,
-                            grasp_volume_quality
-                            from public.grasp WHERE hand_id=4
-                          """
-        self.grasp_cur.execute(sql_hand_grasps)
+            #self.grasp_cur.itersize = self.batch_size
+            # Query for grasps
+            sql_hand_grasps = """
+                                Select scaled_model_id, 
+                                grasp_pregrasp_joints, 
+                                grasp_grasp_joints, 
+                                grasp_pregrasp_position, 
+                                grasp_grasp_position, 
+                                grasp_contacts, 
+                                grasp_epsilon_quality,
+                                grasp_volume_quality
+                                from public.grasp WHERE hand_id=4
+                              """
+            self.grasp_cur.execute(sql_hand_grasps)
         
-        # get grasp batch
-        grasp_batch = self.grasp_cur.fetchmany(self.batch_size)
+        grasp_batch = list(next(self.grasp_cur) for _ in range(self.batch_size))
 
         grasps = list()
         for grasp in grasp_batch:
@@ -134,18 +133,41 @@ def show_model_points(verts):
 py_dir = os.path.dirname(os.path.abspath(__file__))
 
 if __name__ == '__main__':
-    mr = ModelReader()
 
+    """
+        scaled_model_id (int) 
+        grasp_pregrasp_joints (float []) 
+        grasp_grasp_joints (float [])
+        grasp_pregrasp_position 
+        grasp_grasp_position
+        grasp_contacts
+        grasp_epsilon_quality
+        grasp_volume_quality
+    """
+
+    batch_size = 128
+    mr = ModelReader(batch_size)
     batch = mr.getGraspBatch()
-    i = 0
 
+    i = 0
+    while len(batch) > 0:
+        batch = mr.getGraspBatch()
+        i += 1
+        print(i)
+
+
+    #
     # Draw a model from a grasp
-    one_grasp = batch[0]
-    scale, model_path = mr.getModelInfo(one_grasp["scaled_model_id"])
-    model_file = open(py_dir + "/../" + model_path)
-    verts, faces = read_off(model_file)
-    show_model_points(verts)
-    
+    #
+    #one_grasp = batch[0]
+    #scale, model_path = mr.getModelInfo(one_grasp["scaled_model_id"])
+    #model_file = open(py_dir + "/../" + model_path)
+    #verts, faces = read_off(model_file)
+    #show_model_points(verts)
+   
+    #
+    # Write joints to file
+    #
     #graspfile = open("grasp_joints.txt", "w")
     #while len(batch) > 0:
     #    batch = mr.getGraspBatch()
@@ -154,9 +176,10 @@ if __name__ == '__main__':
     #    i+=1
     #    print(i)
     #graspfile.close()
+
+    #
+    # Read joints from file
+    #
     #graspfile = open("grasp_joints.txt", "r")
     #print(ast.literal_eval(graspfile.readline()))
-
-
-        
 
