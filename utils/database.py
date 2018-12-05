@@ -149,21 +149,24 @@ if __name__ == '__main__':
     mr = ModelReader(batch_size)
     batch = mr.getGraspBatch()
 
-    i = 0
-    while len(batch) > 0:
-        batch = mr.getGraspBatch()
-        i += 1
-        print(i)
+    #i = 0
+    #while len(batch) > 0:
+    #    batch = mr.getGraspBatch()
+    #    i += 1
+    #    print(i)
 
 
     #
     # Draw a model from a grasp
     #
-    #one_grasp = batch[0]
-    #scale, model_path = mr.getModelInfo(one_grasp["scaled_model_id"])
-    #model_file = open(py_dir + "/../" + model_path)
-    #verts, faces = read_off(model_file)
-    #show_model_points(verts)
+    one_grasp = batch[0]
+    params = config(section='data')
+
+    scale, model_path = mr.getModelInfo(one_grasp["scaled_model_id"])
+    model_file = open(params['model_dir'] + model_path)
+
+    verts, faces = read_off(model_file)
+    show_model_points(verts)
    
     #
     # Write joints to file
