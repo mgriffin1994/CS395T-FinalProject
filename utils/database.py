@@ -164,9 +164,14 @@ if __name__ == '__main__':
 
     scale, model_path = mr.getModelInfo(one_grasp["scaled_model_id"])
     model_file = open(params['model_dir'] + model_path)
+    from pyntcloud import PyntCloud
+    m = PyntCloud.from_file(params['model_dir'] + model_path)
+    print(m)
+    m.plot(mesh=True, backend="matplotlib")
 
-    verts, faces = read_off(model_file)
-    show_model_points(verts)
+
+    #verts, faces = read_off(model_file)
+    #show_model_points(verts)
    
     #
     # Write joints to file
