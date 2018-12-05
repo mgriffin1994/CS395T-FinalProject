@@ -1,7 +1,9 @@
 from configparser import ConfigParser
+import os
+
+py_dir = os.path.dirname(os.path.abspath(__file__))
  
- 
-def config(filename='database.ini', section='postgresql'):
+def config(filename=py_dir+'/database.ini', section='postgresql'):
     # create a parser
     parser = ConfigParser()
     # read config file

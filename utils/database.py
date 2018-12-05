@@ -1,4 +1,7 @@
 import psycopg2
+import pickle
+import ast
+import os
 from config import config
  
 class ModelReader:
@@ -99,13 +102,61 @@ class ModelReader:
         cur.close()
         return scale_dict['scaled_model_scale'], model_file_path
 
+
+def read_off(file):
+    if 'OFF' != file.readline().strip():
+        raise('Not a valid OFF header')
+    n_verts, n_faces, n_dontknow = tuple([int(s) for s in file.readline().strip().split(' ')])
+    verts = [[float(s) for s in file.readline().strip().split(' ')] for i_vert in range(n_verts)]
+    faces = [[int(s) for s in file.readline().strip().split(' ')][1:] for i_face in range(n_faces)]
+    return verts, faces 
  
- 
+def show_model_points(verts):
+    print("Num points: ",len(verts))
+    x_vals = list()
+    y_vals = list()
+    z_vals = list()
+    
+    for p in verts:
+        x_vals.append(p[0])
+        y_vals.append(p[1])
+        z_vals.append(p[2])
+
+    from matplotlib import pyplot
+    from mpl_toolkits.mplot3d import Axes3D
+    
+    fig = pyplot.figure()
+    ax = Axes3D(fig)
+    
+    ax.scatter(x_vals, y_vals, z_vals, c='r', marker='o')
+    pyplot.show()
+
+py_dir = os.path.dirname(os.path.abspath(__file__))
+
 if __name__ == '__main__':
     mr = ModelReader()
 
     batch = mr.getGraspBatch()
-    for grasp_data in batch:
-        print(mr.getModelInfo(grasp_data['scaled_model_id']))
+    i = 0
+
+    # Draw a model from a grasp
+    one_grasp = batch[0]
+    scale, model_path = mr.getModelInfo(one_grasp["scaled_model_id"])
+    model_file = open(py_dir + "/../" + model_path)
+    verts, faces = read_off(model_file)
+    show_model_points(verts)
+    
+    #graspfile = open("grasp_joints.txt", "w")
+    #while len(batch) > 0:
+    #    batch = mr.getGraspBatch()
+    #    for grasp_data in batch:
+    #        graspfile.write("%s\n" % str(grasp_data['grasp_grasp_joints']))
+    #    i+=1
+    #    print(i)
+    #graspfile.close()
+    #graspfile = open("grasp_joints.txt", "r")
+    #print(ast.literal_eval(graspfile.readline()))
+
+
         
 
