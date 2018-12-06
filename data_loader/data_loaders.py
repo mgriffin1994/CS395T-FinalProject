@@ -1,6 +1,7 @@
 from torchvision import datasets, transforms
 import torch
 from base import BaseDataLoader
+from utils.database import ModelReader
 
 import numpy as np
 
@@ -27,22 +28,23 @@ class CIFAR10DataLoader(BaseDataLoader):
         super(CIFAR10DataLoader, self).__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
        
 class JointAngleDataset(torch.utils.data.Dataset):
-    # TODO
-    def __init__(self):
+    def __init__(self, batch_size):
         super(JointAngleDataset, self).__init__()
-        pass
+        self.batch_size = batch_size
+        self.mr = ModelReader(batch_size)
+        self.data = [self.mr.prepare_sample(grasp_data)['grasp_grasp_joints'] for  grasp_data in self.mr.getAll()]
 
     def __len__(self):
-        return 1
+        return len(self.data)
 
     def __getitem__(self, idx):
-        return np.array([1] * 12).astype(np.float32), 1
+        return torch.FloatTensor(self.data[idx])
 
 
 class JointAngleDataLoader(BaseDataLoader):
     def __init__(self, data_dir, batch_size, shuffle, validation_split, num_workers, training=True):
         self.data_dir = data_dir
-        self.dataset = JointAngleDataset()
+        self.dataset = JointAngleDataset(batch_size)
         super(JointAngleDataLoader, self).__init__(self.dataset, batch_size, shuffle, validation_split, num_workers)
 
         

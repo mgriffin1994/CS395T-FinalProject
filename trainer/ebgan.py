@@ -113,7 +113,7 @@ class EBGANTrainer(BaseTrainer):
         g_loss = AverageMeter()
 
         end_time = time.time()
-        for batch_idx, (data, labels) in enumerate(self.data_loader):
+        for batch_idx, data in enumerate(self.data_loader):
             data_time.update(time.time() - end_time)
 
             # Train the discriminator
@@ -210,7 +210,7 @@ class EBGANTrainer(BaseTrainer):
 
         end_time = time.time()
         with torch.no_grad():
-            for batch_idx, (data, labels) in enumerate(self.valid_data_loader):
+            for batch_idx, data in enumerate(self.valid_data_loader):
                 data_time.update(time.time() - end_time)
 
                 x_real = data.to(self.device)

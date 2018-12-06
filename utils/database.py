@@ -2,77 +2,119 @@ import psycopg2
 import pickle
 import ast
 import os
-from config import config
+from utils.config import config
  
 class ModelReader:
+    """ModelReader class
     
-    def __init__(self, batch_size=32):
+    Connects to the PSQL database for CGDB-10.0
+    to fetch grasp info.
+
+    Parameters
+    ----------
+    verbose : boolean, optional
+        Defaults to False
+
+    """
+    def __init__(self, verbose=False):
+        self.verbose = verbose
         self.conn = None
-        self.grasp_cur = None
-        self.batch_size = batch_size
         self.connect()
+        self.grasp_cur = self.query()
         
     def connect(self):
+        """Connect to the PSQL database"""
         try:
             # read connection parameters
             params = config()
  
             # connect to the PostgreSQL server
-            print('Connecting to the PostgreSQL database...')
+            if self.verbose:
+                print('Connecting to the PostgreSQL database...')
             self.conn = psycopg2.connect(**params)
  
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
 
-    def getGraspBatch(self):
-        """
-        @returns A list of hand grasp data of size batch_size
+    def query(self):
+        """Create the cursor"""
+        grasp_cur = self.conn.cursor()
+        # Query for grasps
+        sql_hand_grasps = """
+                            Select scaled_model_id, 
+                            grasp_pregrasp_joints, 
+                            grasp_grasp_joints, 
+                            grasp_pregrasp_position, 
+                            grasp_grasp_position, 
+                            grasp_contacts, 
+                            grasp_epsilon_quality,
+                            grasp_volume_quality
+                            from public.grasp WHERE hand_id=4
+                          """
+        grasp_cur.execute(sql_hand_grasps)
+        return grasp_cur
+
+    def prepare_sample(self, sample):
+        """Puts the sample in the appropriate dict"""
+        return { 
+                'scaled_model_id':sample[0],
+                'grasp_pregrasp_joints':sample[1], 
+                'grasp_grasp_joints':sample[2], 
+                'grasp_pregrasp_position':sample[3], 
+                'grasp_grasp_position':sample[4], 
+                'grasp_contacts':sample[5], 
+                'grasp_epsilon_quality':sample[6],
+                'grasp_volume_quality':sample[7]
+        }
+
+
+    def getGraspBatch(self, batch_size=32):
+        """Gets a list of hand grasp data of size batch_size
+        
+        Parameters
+        ----------
+        batch_size : int, optional
+            Defaults to 32
+
+        Returns
+        -------
+        list
+            Size of batch_size
+
+        Raises
+        ------
+        ConnectionError
+            if not connected to the PSQL database
+
         """
         if self.conn == None:
-            print("Can't get model batch, no connection")
+            raise ConnectionError("Can't get model batch, no connection")
 
         # Create cursor if not already exists
         if self.grasp_cur == None:
-            self.grasp_cur = self.conn.cursor()
-            #self.grasp_cur.itersize = self.batch_size
-            # Query for grasps
-            sql_hand_grasps = """
-                                Select scaled_model_id, 
-                                grasp_pregrasp_joints, 
-                                grasp_grasp_joints, 
-                                grasp_pregrasp_position, 
-                                grasp_grasp_position, 
-                                grasp_contacts, 
-                                grasp_epsilon_quality,
-                                grasp_volume_quality
-                                from public.grasp WHERE hand_id=4
-                              """
-            self.grasp_cur.execute(sql_hand_grasps)
-        
-        grasp_batch = list(next(self.grasp_cur) for _ in range(self.batch_size))
+            self.grasp_cur = self.query()
+        try:
+            grasp_batch = list(next(self.grasp_cur) for _ in range(self.batch_size))
+        except StopIteration:
+            print ("Ran through all batches. Re-querying")
+            self.grasp_cur = self.query()
 
-        grasps = list()
-        for grasp in grasp_batch:
-            grasp_dict = {
-                'scaled_model_id':grasp[0],
-                'grasp_pregrasp_joints':grasp[1], 
-                'grasp_grasp_joints':grasp[2], 
-                'grasp_pregrasp_position':grasp[3], 
-                'grasp_grasp_position':grasp[4], 
-                'grasp_contacts':grasp[5], 
-                'grasp_epsilon_quality':grasp[6],
-                'grasp_volume_quality':grasp[7]
-            }
-            grasps.append(grasp_dict) 
-
+        grasps = [self.prepare_sample(grasp) for grasp in grasp_batch]
         return grasps
 
     def getModelInfo(self, scaled_model_id):
         """
         Gets the scale of the model (for a grasp) and the path to the
         model's object file
-        @params scaled_model_id ID of a scaled model from a grasp
-        @returns tuple pair of (model_scale, model_file_path)
+        
+        Parameters
+        ----------
+        scaled_model_id : int
+            ID of a scaled model from a grasp
+
+        Returns
+        -------
+        tuple pair of (model_scale, model_file_path)
         """
         cur = self.conn.cursor()
 
@@ -100,6 +142,17 @@ class ModelReader:
         # close the communication with the PostgreSQL
         cur.close()
         return scale_dict['scaled_model_scale'], model_file_path
+
+    def getAll(self):
+        """Get all information in the database"""
+        grasp_cur = self.query()
+        return grasp_cur.fetchall()
+
+    def __len__(self):
+        """Number of samples in the database"""
+        if not self.size:
+            self.size = self.getAll()
+        return self.size
 
 
 def read_off(file):
@@ -146,8 +199,8 @@ if __name__ == '__main__':
     """
 
     batch_size = 128
-    mr = ModelReader(batch_size)
-    batch = mr.getGraspBatch()
+    mr = ModelReader()
+    batch = mr.getGraspBatch(batch_size)
 
     #i = 0
     #while len(batch) > 0:

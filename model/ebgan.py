@@ -19,7 +19,7 @@ def _layer_init(m, mean, std):
             m.bias.data.zero_()
 
 class Discriminator(BaseModel):
-    def __init__(self, num_joint_angles=12, hidden_dim=256):
+    def __init__(self, num_joint_angles=21, hidden_dim=256):
         super(Discriminator, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_joint_angles = num_joint_angles
@@ -45,18 +45,16 @@ class Discriminator(BaseModel):
 
 
 class Generator(BaseModel):
-    def __init__(self, num_outputs=12, noise_dim=100): 
+    def __init__(self, num_outputs=21, noise_dim=100): 
         super(Generator, self).__init__()
         self.noise_dim = noise_dim
         self.num_outputs = num_outputs
         self.generator = nn.Sequential(
                 nn.Linear(noise_dim, 128),
                 nn.ReLU(),
-                nn.Linear(128, num_outputs),
-                nn.ReLU()) # TODO - decide what to do with this output layer
+                nn.Linear(128, num_outputs))
 
     def forward(self, z):
-        #z = z.view(z.size(0), self.noise_dim, 1, 1)
         out = self.generator(z)
         return out
 
