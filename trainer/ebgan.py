@@ -46,12 +46,12 @@ class EBGANTrainer(BaseTrainer):
     """EBGAN Trainer Class"""
     def __init__(self, generator, discriminator, metrics, 
                  g_optimizer, d_optimizer, resume, config, data_loader,
-                 margin=20, pt_regularization=0.1, valid_data_loader=None, g_lr_scheduler=None, d_lr_scheduler=None, train_logger=None):
+                 margin=30, pt_regularization=0.1, valid_data_loader=None, g_lr_scheduler=None, d_lr_scheduler=None, train_logger=None):
         super(EBGANTrainer, self).__init__([generator, discriminator], metrics, [g_optimizer, d_optimizer], resume, config, train_logger)
-        self.generator = generator
-        self.discriminator = discriminator
-        self.g_optimizer = g_optimizer
-        self.d_optimizer = d_optimizer
+        self.generator = self.models[0] 
+        self.discriminator = self.models[1] 
+        self.g_optimizer = self.optimizers[0]
+        self.d_optimizer = self.optimizers[1] 
 
         self.config = config
         self.data_loader = data_loader
@@ -59,19 +59,26 @@ class EBGANTrainer(BaseTrainer):
         self.do_validation = self.valid_data_loader is not None
         self.g_lr_scheduler = g_lr_scheduler
         self.d_lr_scheduler = d_lr_scheduler
-        self.log_step = int(np.sqrt(data_loader.batch_size))
+        if data_loader:
+            self.log_step = int(np.sqrt(data_loader.batch_size))
         self.margin = margin
+
+    def get_reconstruction_loss(self, x):
+        """Get the reconstruction loss from the discriminator"""
+        x = x.to(self.device)
+        D = self.discriminator(x)[0]
+        return self._discriminator_loss(x, D)
 
 
     def _discriminator_loss(self, inputs, target):
         """Discriminator loss"""
         # TODO - consider having this as a changeable parameter
-        return F.mse_loss(inputs, target)
+        return F.mse_loss(inputs, target, reduction='sum')
     
     def _generator_loss(self, x_fake, D_fake, D_latent):
         """Generator loss"""
         G_loss_PT = repelling_regularizer(D_latent, D_latent)
-        G_loss_fake = F.mse_loss(x_fake, D_fake)
+        G_loss_fake = F.mse_loss(x_fake, D_fake, reduction='sum')
         return G_loss_PT + G_loss_fake
 
     def _sample_z(self, batch_size, dim, dist='normal'):
@@ -117,16 +124,18 @@ class EBGANTrainer(BaseTrainer):
             data_time.update(time.time() - end_time)
 
             # Train the discriminator
-            x_real = data.to(self.device)
-            D_real = self.discriminator(x_real)[0]
-
-            D_loss_real = self._discriminator_loss(x_real, D_real)
+            D_loss_real = self.get_reconstruction_loss(data)
+            #x_real = data.to(self.device)
+            #D_real = self.discriminator(x_real)[0]
+            #D_loss_real = self._discriminator_loss(x_real, D_real)
 
             z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
             z = z.to(self.device)
             x_fake = self.generator(z)
-            D_fake = self.discriminator(x_fake.detach())[0]
-            D_loss_fake = self._discriminator_loss(x_fake, D_fake)
+
+            D_loss_fake = self.get_reconstruction_loss(x_fake.detach())
+            #D_fake = self.discriminator(x_fake.detach())[0]
+            #D_loss_fake = self._discriminator_loss(x_fake, D_fake)
 
             D_loss = D_loss_real
             if D_loss_fake.item() < self.margin:
@@ -151,8 +160,8 @@ class EBGANTrainer(BaseTrainer):
             batch_time.update(time.time() - end_time)
             end_time = time.time()
             
-            dlr.update(D_loss_real.item(), x_real.size(0))
-            dlf.update(D_loss_fake.item(), x_real.size(0))
+            dlr.update(D_loss_real.item(), data.size(0))
+            dlf.update(D_loss_fake.item(), data.size(0))
             g_loss.update(G_loss.item(), z.size(0))
 
             if self.verbosity >= 2:
@@ -213,15 +222,18 @@ class EBGANTrainer(BaseTrainer):
             for batch_idx, data in enumerate(self.valid_data_loader):
                 data_time.update(time.time() - end_time)
 
-                x_real = data.to(self.device)
-                D_real = self.discriminator(x_real)[0]
-                D_loss_real = self._discriminator_loss(x_real, D_real)
+                D_loss_real = self.get_reconstruction_loss(data)
+                #x_real = data.to(self.device)
+                #D_real = self.discriminator(x_real)[0]
+                #D_loss_real = self._discriminator_loss(x_real, D_real)
 
                 z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
                 z = z.to(self.device)
                 x_fake = self.generator(z)
-                D_fake = self.discriminator(x_fake.detach())[0]
-                D_loss_fake = self._discriminator_loss(x_fake, D_fake)
+
+                D_loss_fake = self.get_reconstruction_loss(x_fake.detach())
+                #D_fake = self.discriminator(x_fake.detach())[0]
+                #D_loss_fake = self._discriminator_loss(x_fake, D_fake)
 
                 D_loss = D_loss_real
                 if D_loss_fake.item() < self.margin:
@@ -236,8 +248,8 @@ class EBGANTrainer(BaseTrainer):
 
                 batch_time.update(time.time() - end_time)
 
-                dlr.update(D_loss_real.item(), x_real.size(0))
-                dlf.update(D_loss_fake.item(), x_real.size(0))
+                dlr.update(D_loss_real.item(), data.size(0))
+                dlf.update(D_loss_fake.item(), data.size(0))
                 g_loss.update(G_loss.item(), z.size(0))
 
                 if self.verbosity >= 2:
@@ -248,9 +260,9 @@ class EBGANTrainer(BaseTrainer):
                           'Discriminator Loss (Fake) {dlf.val:.4f} ({dlf.avg:.4f})\t'
                           'Generator Loss {g_loss.val:.4f} ({g_loss.avg:.4f})\t'.format(
                         epoch,
-                        batch_idx * self.data_loader.batch_size,
-                        self.data_loader.n_samples,
-                        100.0 * batch_idx / len(self.data_loader),
+                        batch_idx * self.valid_data_loader.batch_size,
+                        self.data_loader.n_valid_samples,
+                        100.0 * batch_idx / len(self.valid_data_loader),
                         batch_time=batch_time,
                         data_time=data_time,
                         dlr=dlr,
@@ -264,8 +276,3 @@ class EBGANTrainer(BaseTrainer):
         }
 
         return log
-
-    def sample_generator():
-        # TODO
-        pass
-        

@@ -1,6 +1,6 @@
 {
     "name": "EBGAN",
-    "n_gpu": 2,
+    "n_gpu": 1,
     
     "g_arch": {
         "type": "Generator",
@@ -16,9 +16,9 @@
         "type": "JointAngleDataLoader",
         "args":{
             "data_dir": "data/",
-            "batch_size": 128,
+            "batch_size": 32,
             "shuffle": true,
-            "validation_split": 0.1,
+            "validation_split": 0.2,
             "num_workers": 2
         }
     },
@@ -57,7 +57,7 @@
         }
     },
     "trainer": {
-        "epochs": 1000,
+        "epochs": 100,
         "save_dir": "saved/",
         "save_freq": 1,
         "verbosity": 3,

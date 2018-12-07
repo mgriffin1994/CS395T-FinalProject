@@ -47,7 +47,6 @@ class BaseTrainer:
         self.device, device_ids = self._prepare_device(config['n_gpu'])
         self.models = []
 
-        # TODO - check that this works
         for i, model in enumerate(models):
             self.models.append(model.to(self.device))
             if len(device_ids) > 1:
@@ -159,8 +158,8 @@ class BaseTrainer:
         }
         for i, model in enumerate(self.models):
             arch = type(model).__name__
-            state['arch'] = arch
-            state['{}-statedict'.format(arch)] = model.state_dict()
+            state['arch{0}'.format(i)] = arch
+            state['{0}-statedict'.format(i)] = model.state_dict()
         for i, optimizer in enumerate(self.optimizers):
             state['optimizer{}'.format(i)] = optimizer.state_dict()
 
@@ -187,12 +186,12 @@ class BaseTrainer:
         self.monitor_best = checkpoint['monitor_best']
 
         # load architecture params from checkpoint.
-        for model in self.models:
+        for i, model in enumerate(self.models):
             #if checkpoint['config']['arch'] != self.config['arch']:
             #        self.logger.warning('Warning: Architecture configuration given in config file is different from that of checkpoint. ' + \
             #                        'This may yield an exception while state_dict is being loaded.')
             arch = type(model).__name__
-            model.load_state_dict(checkpoint['{}-state_dict'.format(arch)])
+            model.load_state_dict(checkpoint['{0}-state_dict'.format(i)])
 
         # load optimizer state from checkpoint only when optimizer type is not changed. 
         for i, optimizer in enumerate(self.optimizers):

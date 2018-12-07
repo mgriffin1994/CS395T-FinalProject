@@ -21,6 +21,9 @@ def main(config, resume):
     data_loader = get_instance(module_data, 'data_loader', config)
     valid_data_loader = data_loader.split_validation()
 
+    print (len(data_loader))
+    print (len(valid_data_loader))
+
     # build model architecture
     generator = get_instance(EBGAN, 'g_arch', config)
     generator.summary()

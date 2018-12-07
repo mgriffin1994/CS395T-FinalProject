@@ -19,22 +19,22 @@ def _layer_init(m, mean, std):
             m.bias.data.zero_()
 
 class Discriminator(BaseModel):
-    def __init__(self, num_joint_angles=21, hidden_dim=256):
+    def __init__(self, num_joint_angles=20, hidden_dim=256):
         super(Discriminator, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_joint_angles = num_joint_angles
         self.encode = nn.Sequential(
             nn.Linear(num_joint_angles, 10),
-            nn.Tanh(),
+            nn.LeakyReLU(0.2),
             nn.Linear(10, 8),
-            nn.Tanh(),
+            nn.LeakyReLU(0.2),
             nn.Linear(8, 4),
-            nn.Tanh())
+            nn.LeakyReLU(0.2))
         self.decode = nn.Sequential(
             nn.Linear(4, 8),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(8, 10),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(10, num_joint_angles))
 
     def forward(self, joint_angles):
@@ -45,14 +45,16 @@ class Discriminator(BaseModel):
 
 
 class Generator(BaseModel):
-    def __init__(self, num_outputs=21, noise_dim=100): 
+    def __init__(self, num_outputs=20, noise_dim=100): 
         super(Generator, self).__init__()
         self.noise_dim = noise_dim
         self.num_outputs = num_outputs
         self.generator = nn.Sequential(
-                nn.Linear(noise_dim, 128),
+                nn.Linear(noise_dim, 256),
                 nn.ReLU(),
-                nn.Linear(128, num_outputs))
+                nn.Linear(256, 256),
+                nn.ReLU(),
+                nn.Linear(256, num_outputs))
 
     def forward(self, z):
         out = self.generator(z)
