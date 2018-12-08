@@ -32,13 +32,13 @@ class JointAngleDataset(torch.utils.data.Dataset):
         super(JointAngleDataset, self).__init__()
         self.batch_size = batch_size
         self.mr = ModelReader(batch_size)
-        self.data = [self.mr.prepare_sample(grasp_data)['grasp_grasp_joints'][1:] for  grasp_data in self.mr.getAll()]
+        self.data = np.array([self.mr.prepare_sample(grasp_data)['grasp_grasp_joints'][1:] for  grasp_data in self.mr.getAll()])
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return torch.FloatTensor(self.data[idx])
+        return torch.FloatTensor(self.data[idx] / 2) # Joint angles naturally between -0.5 and 2
 
 
 class JointAngleDataLoader(BaseDataLoader):

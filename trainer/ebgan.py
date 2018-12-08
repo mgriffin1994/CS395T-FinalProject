@@ -46,10 +46,15 @@ class EBGANTrainer(BaseTrainer):
     """EBGAN Trainer Class"""
     def __init__(self, generator, discriminator, metrics, 
                  g_optimizer, d_optimizer, resume, config, data_loader,
-                 margin=30, pt_regularization=0.1, valid_data_loader=None, g_lr_scheduler=None, d_lr_scheduler=None, train_logger=None):
+                 margin=20, pt_regularization=0.1, valid_data_loader=None, g_lr_scheduler=None, d_lr_scheduler=None, train_logger=None):
         super(EBGANTrainer, self).__init__([generator, discriminator], metrics, [g_optimizer, d_optimizer], resume, config, train_logger)
-        self.generator = self.models[0] 
-        self.discriminator = self.models[1] 
+        self.generator = self.models[0]
+        self.discriminator = self.models[1]
+        try:
+            self.noise_dim = self.generator.noise_dim
+        except AttributeError:
+            self.noise_dim = self.generator.module.noise_dim
+
         self.g_optimizer = self.optimizers[0]
         self.d_optimizer = self.optimizers[1] 
 
@@ -129,7 +134,7 @@ class EBGANTrainer(BaseTrainer):
             #D_real = self.discriminator(x_real)[0]
             #D_loss_real = self._discriminator_loss(x_real, D_real)
 
-            z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
+            z = self._sample_z(self.data_loader.batch_size, self.noise_dim)
             z = z.to(self.device)
             x_fake = self.generator(z)
 
@@ -146,7 +151,7 @@ class EBGANTrainer(BaseTrainer):
             self.d_optimizer.step()
 
             # Train the generator
-            z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
+            z = self._sample_z(self.data_loader.batch_size, self.noise_dim)
             z = z.to(self.device)
             x_fake = self.generator(z)
             D_fake, D_latent = self.discriminator(x_fake)
@@ -227,7 +232,7 @@ class EBGANTrainer(BaseTrainer):
                 #D_real = self.discriminator(x_real)[0]
                 #D_loss_real = self._discriminator_loss(x_real, D_real)
 
-                z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
+                z = self._sample_z(self.data_loader.batch_size, self.noise_dim)
                 z = z.to(self.device)
                 x_fake = self.generator(z)
 
@@ -239,7 +244,7 @@ class EBGANTrainer(BaseTrainer):
                 if D_loss_fake.item() < self.margin:
                     D_loss += (self.margin - D_loss_fake)
 
-                z = self._sample_z(self.data_loader.batch_size, self.generator.noise_dim)
+                z = self._sample_z(self.data_loader.batch_size, self.noise_dim)
                 z = z.to(self.device)
                 x_fake = self.generator(z)
                 D_fake, D_latent = self.discriminator(x_fake)

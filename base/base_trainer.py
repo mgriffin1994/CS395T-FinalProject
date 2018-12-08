@@ -50,7 +50,7 @@ class BaseTrainer:
         for i, model in enumerate(models):
             self.models.append(model.to(self.device))
             if len(device_ids) > 1:
-                self.models[i] = torch.nn.DataParallel(models, device_ids=device_ids)
+                self.models[i] = torch.nn.DataParallel(self.models[i], device_ids=device_ids)
 
         self.metrics = metrics
         self.optimizers = optimizers
