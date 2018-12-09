@@ -114,7 +114,7 @@ class ModelReader:
 
         Returns
         -------
-        tuple pair of (model_scale, model_file_path)
+        tuple pair of (model_scale, model_grasping_rescale, model_file_path)
         """
         cur = self.conn.cursor()
 
