@@ -7,7 +7,9 @@ Code forked from https://github.com/1Konny/EBGAN-pytorch
 
 """
 
+import torch
 import torch.nn as nn
+from torch.nn import functional as F
 
 from base import BaseModel
 
@@ -19,30 +21,68 @@ def _layer_init(m, mean, std):
             m.bias.data.zero_()
 
 class Discriminator(BaseModel):
-    def __init__(self, num_joint_angles=20, hidden_dim=256):
+    def __init__(self, num_joint_angles=20):
         super(Discriminator, self).__init__()
-        self.hidden_dim = hidden_dim
         self.num_joint_angles = num_joint_angles
         self.encode = nn.Sequential(
-            nn.Linear(num_joint_angles, 10),
+            nn.Linear(num_joint_angles, 16),
             nn.LeakyReLU(0.2),
-            nn.Linear(10, 8),
+            nn.BatchNorm1d(16),
+            nn.Linear(16, 8),
             nn.LeakyReLU(0.2),
-            nn.Linear(8, 4),
-            nn.LeakyReLU(0.2))
+            nn.BatchNorm1d(8),
+            nn.Linear(8, 8),
+            nn.Tanh())
         self.decode = nn.Sequential(
-            nn.Linear(4, 8),
+            nn.Linear(8, 8),
             nn.ReLU(),
-            nn.Linear(8, 10),
+            nn.BatchNorm1d(8),
+            nn.Linear(8, 16),
             nn.ReLU(),
-            nn.Linear(10, num_joint_angles))
+            nn.BatchNorm1d(16),
+            nn.Linear(16, num_joint_angles),
+            nn.Tanh())
 
     def forward(self, joint_angles):
         latent = self.encode(joint_angles)
         out = self.decode(latent)
         return out, latent.view(joint_angles.size(0), -1)
 
+    def _weight_init(self, mean, std):
+        for m in self._modules:
+            _layer_init(self._modules[m], mean, std)
 
+class Discriminatorvae(BaseModel):
+    def __init__(self, num_joint_angles=20, hidden_dim=256):
+        super(Discriminatorvae, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_joint_angles = num_joint_angles
+
+        self.fc1 = nn.Linear(num_joint_angles, 16)
+        self.fc21 = nn.Linear(16, 4)
+        self.fc22 = nn.Linear(16, 4)
+
+        self.fc3 = nn.Linear(4, 16)
+        self.fc4 = nn.Linear(16, num_joint_angles)
+
+    def encode(self, x):
+        h1 = F.relu(self.fc1(x))
+        return self.fc21(h1), self.fc22(h1)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return eps.mul(std).add_(mu)
+
+    def decode(self, z):
+        h3 = F.relu(self.fc3(z))
+        return torch.tanh(self.fc4(h3))
+
+    def forward(self, joint_angles):
+        mu, logvar = self.encode(joint_angles)
+        latent = self.reparameterize(mu, logvar)
+        out = self.decode(latent)
+        return out, latent.view(joint_angles.size(0), -1)
 
 class Generator(BaseModel):
     def __init__(self, num_outputs=20, noise_dim=100): 
@@ -50,11 +90,13 @@ class Generator(BaseModel):
         self.noise_dim = noise_dim
         self.num_outputs = num_outputs
         self.generator = nn.Sequential(
-                nn.Linear(noise_dim, 256),
-                nn.ReLU(),
-                nn.Linear(256, 256),
-                nn.ReLU(),
-                nn.Linear(256, num_outputs))
+                nn.Linear(noise_dim, 64),
+                nn.LeakyReLU(0.2),
+                nn.Linear(64, 32),
+                nn.LeakyReLU(0.2),
+                nn.Dropout(0.5),
+                nn.Linear(32, num_outputs),
+                nn.Tanh())
 
     def forward(self, z):
         out = self.generator(z)

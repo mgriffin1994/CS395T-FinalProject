@@ -52,7 +52,9 @@ class JointAngleEnergy(object):
 
         """
         with torch.no_grad():
-            joint_angles = torch.FloatTensor(joint_angles)
+            # Note: divide joint angles by 2 because tanh activation used by 
+            # autoencoder. Joint angles naturally between -1 and 1.5
+            joint_angles = torch.FloatTensor(np.array(joint_angles) / 2)
             D = self.discriminator(joint_angles)[0]
             mse = np.array(F.mse_loss(joint_angles, D, reduction='none').data)
             return mse.sum(axis=1)
@@ -70,8 +72,8 @@ class JointAngleEnergy(object):
         torch tensor of shape (n, 20)
 
         """
-        z = torch.randn(n, self.generator.noise_dim)
-        return  self.generator(z)
+        z = torch.randn(n, self.generator.noise_dim) * 2
+        return np.array(self.generator(z).data)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Template')
