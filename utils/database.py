@@ -2,7 +2,7 @@ import psycopg2
 import pickle
 import ast
 import os
-from config import config
+from utils.config import config
  
 class ModelReader:
     """ModelReader class
