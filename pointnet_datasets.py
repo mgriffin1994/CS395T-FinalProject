@@ -130,9 +130,12 @@ def get_contact_probs(preds, pt_cld, hand_pts, contact_dist=10):
     ind = ind[dist < contact_dist]
     joints = joints[dist < contact_dist]
     contact_pts = pt_cld[ind]
-    
+
     probs = preds[0, ind, joints].data.cpu().numpy()
     return joints, probs
+    
+def get_joint_probs(preds, pt_cld, hand_pts):
+    return get_contact_probs(preds, pt_cld, hand_pts, contact_dist=np.inf)
     
 class ColumbiaGraspDataset():
     def __init__(self, normalize=True):
