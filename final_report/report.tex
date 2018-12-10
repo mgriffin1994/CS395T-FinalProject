@@ -162,7 +162,21 @@ We also trained the PointNet++ on the Columbia dataset, using example grasps to 
 
 \section{Results}
 \subsection{Pose Prior}
-The results for training the EBGAN are shown in Figure \ref{fig:ganresults}. Plotted are the reconstruction distributions, joint angle distributions, and the validation losses for the discriminator and generators. As shown in the figures, the discriminator and generator losses seem to oscillate after around epoch 100, which would imply convergence. Further, the distributions of the reconstruction losses and joint angle distributions seem to match, which appears to be in line with the theoretical results suggested in the original EBGAN paper that the generator would produce results in line with the distribution of the data manifold.  
+An example of a generated hand pose and a real hand pose is shown in figure \ref{fig:ebgansamples}. The results for training the EBGAN are shown in Figure \ref{fig:ganresults}. Plotted are the reconstruction distributions, joint angle distributions, and the validation losses for the discriminator and generators. As shown in the figures, the discriminator and generator losses seem to oscillate after around epoch 100, which would imply convergence. Further, the distributions of the reconstruction losses and joint angle distributions seem to match, which appears to be in line with the theoretical results suggested in the original EBGAN paper that the generator would produce results in line with the distribution of the data manifold once a Nash equilibrium is reached. 
+\begin{figure}[t]
+\caption{EBGAN samples}
+\label{fig:ebgansamples}
+\centering
+\begin{subfigure}[t]{0.23\textwidth}
+\includegraphics[scale=0.15]{gangenerated.png}
+\caption{Generated Hand Pose from EBGAN}
+\end{subfigure}
+\begin{subfigure}[t]{0.23\textwidth}
+\includegraphics[scale=0.15]{realsample.png}
+\caption{Real Hand Pose from Columbia dataset}
+\end{subfigure}
+\end{figure}
+
 \begin{figure*}[h]
 \centering
 \includegraphics[scale=0.45]{gan_res.png}
