@@ -46,7 +46,7 @@ class EBGANTrainer(BaseTrainer):
     """EBGAN Trainer Class"""
     def __init__(self, generator, discriminator, metrics, 
                  g_optimizer, d_optimizer, resume, config, data_loader,
-                 margin=20, pt_regularization=0.1, valid_data_loader=None, g_lr_scheduler=None, d_lr_scheduler=None, train_logger=None):
+                 margin=10, pt_regularization=0.1, valid_data_loader=None, g_lr_scheduler=None, d_lr_scheduler=None, train_logger=None):
         super(EBGANTrainer, self).__init__([generator, discriminator], metrics, [g_optimizer, d_optimizer], resume, config, train_logger)
         self.generator = self.models[0]
         self.discriminator = self.models[1]

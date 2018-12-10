@@ -72,8 +72,8 @@ class JointAngleEnergy(object):
         torch tensor of shape (n, 20)
 
         """
-        z = torch.randn(n, self.generator.noise_dim) * 2
-        return np.array(self.generator(z).data)
+        z = torch.randn(n, self.generator.noise_dim)
+        return np.array(self.generator(z).data) * 2
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PyTorch Template')
