@@ -6,6 +6,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{subcaption}
 
 % Include other packages here, before hyperref.
 
@@ -72,9 +73,9 @@ Again we draw inspiration from the original Shape2Pose, where feature compatibil
 \begin{equation}
 	E_{\text{feat, S2P}} = -\sum_{p \in \text{Body}} \log V_p(m(p))
 \end{equation}
-where $V_p$ is a random forest regression model for the probability that a part $p$ makes contact with the assigned point $m(p)$.
+where $V_p$ is a random forest regression model for the probability that a part $p$ makes contact with the assigned point $m(p)$. 
 
-The corresponding energy in our formulation is parameterized by a neural network rather than a random forest. In particular, we use a PointNet++ network (ref) to predict the log probability that each point on the mesh is the nearest point to each joint or end effector on the hand. An important difference between our formulation and that of Shape2Pose is that we do not directly predict contacts in this way; we simply score based on nearest points.
+The corresponding energy in our formulation is parameterized by a neural network rather than a random forest. In particular, we use a PointNet++ network \cite{DBLP:journals/corr/QiYSG17} to predict the log probability that each point in a point cloud sampled from the mesh is a contact point for any particular joint. We do this by having a neural network which outputs a vector the same dimensionality as the number of joints.  An important difference between our formulation and that of Shape2Pose is that we do not directly predict contacts in this way; we simply score based on nearest points.
 
 \subsection{Distance ($E_{\text{dist}}$)}
 A distance penalty is imposed on the hand for the sum of the distances from each joint and end effector to its nearest point.
@@ -90,12 +91,98 @@ In this way, despite random initialization, our energy will assign higher scores
 
 \section{Learning the Energy}
 \subsection{Pose Prior}
-To learn a prior over poses, we trained an EBGAN model on the Columbia GraspIt dataset (Allen pls explain, maybe add a pic of the histograms you showed us).
+To learn a prior over poses, we trained an EBGAN model (ref) on joint angles extracted from the Columbia GraspIt dataset (ref). The goal of the EBGAN is the same as the original GAN formulation, which is to simultaneously train a generator and discriminator. The discriminator must distinguish real samples from a dataset from fake samples from the generator. On the other hand, the generator uses input from random noise to produce fake samples that should be indistinguishable from real data samples. 
+
+However, the main difference of the EBGAN from the original GAN is the treatment of the discriminator as an energy function. The goal of the discriminator then changes to assigning low energies to real samples and assigning high energies to fake samples. The energy model can vary, but in our case (and in the original paper) an autoencoder is trained with the reconstruction loss being treated as the energy. Given a positive margin $m$, a data sample $x$, and a generated sample $G(z)$, the loss function of this system becomes
+\begin{equation}
+\mathcal{L}_D(x,z) = D(x) + [m - D(G(z))]^+
+\end{equation}
+\begin{equation}
+\mathcal{L}_G(z) = D(G(z)) + f_{PT}
+\end{equation}
+\begin{equation}
+\label{eq:repel}
+f_{PT}(S) = \frac{1}{N(N-1)}\sum_i \sum_{i \neq j} \left( \frac{S_i^T S_j}{\|S_i \| \| S_j \|} \right)^2
+\end{equation}
+where $[\cdot]^+=\max(0, \cdot)$, and $f_{PT}$ [\ref{eq:repel}] represents a repelling regularizer term to prevent mode collapse by orthogonalizing the pairwise sample representation of a mini-batch $S$. The original EBGAN authors note that if the system reaches a Nash equilibrium, then the generator $G$ will produce samples indistinguishable from the distribution of the dataset. The architecture of the model can be seen in Table \ref{table:ebganarch}.
+\begin{table*}[h!]
+\caption{Model architectures of the EBGAN model. $N$ represents the batch size.}
+\label{table:ebganarch}
+\captionsetup[subtable]{position = below}
+\captionsetup[table]{position=top}
+\centering
+\begin{subtable}{0.33\linewidth}
+\begin{tabular}{ |c|c| }
+\hline
+layer type & output size \\
+\hline
+Linear + LeakyReLU & $N \times 16$  \\
+\hline
+Batch Normalization & $N \times 16 $ \\
+\hline 
+Linear + LeakyReLU & $N \times 8$ \\
+\hline
+Batch Normalization & $N \times 8 $ \\
+\hline
+Tanh & $N \times 8 $ \\
+\hline
+Linear + LeakyReLU & $N \times 8$  \\
+\hline
+Batch Normalization & $N \times 8 $ \\
+\hline 
+Linear + LeakyReLU & $N \times 16$ \\
+\hline
+Batch Normalization & $N \times 16$ \\
+\hline
+Tanh & $N \times 16$ \\
+\hline
+\end{tabular}
+\caption{Discriminator's autoencoder architecture}
+\end{subtable}
+\begin{subtable}{0.33\linewidth}
+\begin{tabular}{ |c|c| }
+\hline
+layer type & output size \\
+\hline
+Linear + LeakyReLU & $N \times 64$  \\
+\hline
+Linear + LeakyReLU & $N \times 32$ \\
+\hline
+Linear + LeakyReLU + 50 \% dropout & $N \times 20$ \\
+\hline
+Tanh & $N \times 20$\\
+\hline
+\end{tabular}
+\caption{Generator's architecture.}
+\end{subtable}
+\end{table*}
+
 \subsection{Feature Compatibility}
-We also trained the PointNet++ on the Columbia dataset, using example grasps to learn nearest-point probabilities (Mike pls explain how you trained and the class imbalance thing if possible).
+We also trained the PointNet++ on the Columbia dataset, using example grasps to learn nearest-point probabilities. We do this by taking the included triangular meshes and sampling point clouds from them (proportional to the area of the individual triangles). We decided to use PointNet++ since it handles local geometric information better than the standard PointNet which does better with global geometry. The Columbia grasp dataset however, only includes the joint angles and hand positions so we had to transform that into the actual joint positions. Once we had joint positions we could easily see which of the joints could be considered contact points by seeing if they were within some threshold of any of the points in the point cloud. Then to avoid heavy class imbalance, we use a exponentially weighted smooth label system which labels the closest point to a contact point with 1.0 and values smoothly approaching 0 as we get farther away in terms of geodesic distance. Like in the Shape2Pose paper, we set it though values 20mm away will be given a value of 0.4. We approximate this geodesic distance with euclidean distance \cite{geodesic}. We then train the PointNet++ which combines all of the $V_p$ into one model. Then for a given hand pose's contact points, we can see how likely the model would have predicted those contact points by considering the predicted probability of that joint on the closest point in a sampled point cloud of the mesh. So if the model predicts the bottom of the mesh as being a likely spot to place the end of the thumb, but instead the hand pose has the end of the pinky contacted the mesh there, we would have lower energy.
 
 \section{Results}
+\subsection{Pose Prior}
+An example of a generated hand pose and a real hand pose is shown in figure \ref{fig:ebgansamples}. The results for training the EBGAN are shown in Figure \ref{fig:ganresults}. Plotted are the reconstruction distributions, joint angle distributions, and the validation losses for the discriminator and generators. As shown in the figures, the discriminator and generator losses seem to oscillate after around epoch 100, which would imply convergence. Further, the distributions of the reconstruction losses and joint angle distributions seem to match, which appears to be in line with the theoretical results suggested in the original EBGAN paper that the generator would produce results in line with the distribution of the data manifold once a Nash equilibrium is reached. 
+\begin{figure}[t]
+\caption{EBGAN samples}
+\label{fig:ebgansamples}
+\centering
+\begin{subfigure}[t]{0.23\textwidth}
+\includegraphics[scale=0.15]{gangenerated.png}
+\caption{Generated Hand Pose from EBGAN}
+\end{subfigure}
+\begin{subfigure}[t]{0.23\textwidth}
+\includegraphics[scale=0.15]{realsample.png}
+\caption{Real Hand Pose from Columbia dataset}
+\end{subfigure}
+\end{figure}
 
+\begin{figure*}[h]
+\centering
+\includegraphics[scale=0.45]{gan_res.png}
+\caption{EBGAN training results}
+\label{fig:ganresults}
+\end{figure*}
 \section{Discussion}
 
 %------------------------------------------------------------------------

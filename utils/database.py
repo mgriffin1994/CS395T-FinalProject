@@ -153,8 +153,8 @@ class ModelReader:
 
     def __len__(self):
         """Number of samples in the database"""
-        if not self.size:
-            self.size = self.getAll()
+        if not hasattr(self, 'size'):
+            self.size = len(self.getAll())
         return self.size
 
 
