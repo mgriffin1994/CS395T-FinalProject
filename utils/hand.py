@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from util import rotation_matrix, quat_to_rot
+from utils.util import rotation_matrix, quat_to_rot
 
 class Joint:
     """
