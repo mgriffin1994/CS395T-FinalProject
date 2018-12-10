@@ -6,6 +6,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{subcaption}
 
 % Include other packages here, before hyperref.
 
@@ -90,12 +91,84 @@ In this way, despite random initialization, our energy will assign higher scores
 
 \section{Learning the Energy}
 \subsection{Pose Prior}
-To learn a prior over poses, we trained an EBGAN model on the Columbia GraspIt dataset (Allen pls explain, maybe add a pic of the histograms you showed us).
+To learn a prior over poses, we trained an EBGAN model (ref) on joint angles extracted from the Columbia GraspIt dataset (ref). The goal of the EBGAN is the same as the original GAN formulation, which is to simultaneously train a generator and discriminator. The discriminator must distinguish real samples from a dataset from fake samples from the generator. On the other hand, the generator uses input from random noise to produce fake samples that should be indistinguishable from real data samples. 
+
+However, the main difference of the EBGAN from the original GAN is the treatment of the discriminator as an energy function. The goal of the discriminator then changes to assigning low energies to real samples and assigning high energies to fake samples. The energy model can vary, but in our case (and in the original paper) an autoencoder is trained with the reconstruction loss being treated as the energy. Given a positive margin $m$, a data sample $x$, and a generated sample $G(z)$, the loss function of this system becomes
+\begin{equation}
+\mathcal{L}_D(x,z) = D(x) + [m - D(G(z))]^+
+\end{equation}
+\begin{equation}
+\mathcal{L}_G(z) = D(G(z)) + f_{PT}
+\end{equation}
+\begin{equation}
+\label{eq:repel}
+f_{PT}(S) = \frac{1}{N(N-1)}\sum_i \sum_{i \neq j} \left( \frac{S_i^T S_j}{\|S_i \| \| S_j \|} \right)^2
+\end{equation}
+where $[\cdot]^+=\max(0, \cdot)$, and $f_{PT}$ [\ref{eq:repel}] represents a repelling regularizer term to prevent mode collapse by orthogonalizing the pairwise sample representation of a mini-batch $S$. The original EBGAN authors note that if the system reaches a Nash equilibrium, then the generator $G$ will produce samples indistinguishable from the distribution of the dataset. The architecture of the model can be seen in Table \ref{table:ebganarch}.
+\begin{table*}[h!]
+\caption{Model architectures of the EBGAN model. $N$ represents the batch size.}
+\label{table:ebganarch}
+\captionsetup[subtable]{position = below}
+\captionsetup[table]{position=top}
+\centering
+\begin{subtable}{0.33\linewidth}
+\begin{tabular}{ |c|c| }
+\hline
+layer type & output size \\
+\hline
+Linear + LeakyReLU & $N \times 16$  \\
+\hline
+Batch Normalization & $N \times 16 $ \\
+\hline 
+Linear + LeakyReLU & $N \times 8$ \\
+\hline
+Batch Normalization & $N \times 8 $ \\
+\hline
+Tanh & $N \times 8 $ \\
+\hline
+Linear + LeakyReLU & $N \times 8$  \\
+\hline
+Batch Normalization & $N \times 8 $ \\
+\hline 
+Linear + LeakyReLU & $N \times 16$ \\
+\hline
+Batch Normalization & $N \times 16$ \\
+\hline
+Tanh & $N \times 16$ \\
+\hline
+\end{tabular}
+\caption{Discriminator's autoencoder architecture}
+\end{subtable}
+\begin{subtable}{0.33\linewidth}
+\begin{tabular}{ |c|c| }
+\hline
+layer type & output size \\
+\hline
+Linear + LeakyReLU & $N \times 64$  \\
+\hline
+Linear + LeakyReLU & $N \times 32$ \\
+\hline
+Linear + LeakyReLU + 50 \% dropout & $N \times 20$ \\
+\hline
+Tanh & $N \times 20$\\
+\hline
+\end{tabular}
+\caption{Generator's architecture.}
+\end{subtable}
+\end{table*}
+
 \subsection{Feature Compatibility}
 We also trained the PointNet++ on the Columbia dataset, using example grasps to learn nearest-point probabilities (Mike pls explain how you trained and the class imbalance thing if possible).
 
 \section{Results}
-
+\subsection{Pose Prior}
+The results for training the EBGAN are shown in Figure \ref{fig:ganresults}. Plotted are the reconstruction distributions, joint angle distributions, and the validation losses for the discriminator and generators. As shown in the figures, the discriminator and generator losses seem to oscillate after around epoch 100, which would imply convergence. Further, the distributions of the reconstruction losses and joint angle distributions seem to match, which appears to be in line with the theoretical results suggested in the original EBGAN paper that the generator would produce results in line with the distribution of the data manifold.  
+\begin{figure*}[h]
+\centering
+\includegraphics[scale=0.45]{gan_res.png}
+\caption{EBGAN training results}
+\label{fig:ganresults}
+\end{figure*}
 \section{Discussion}
 
 %------------------------------------------------------------------------
